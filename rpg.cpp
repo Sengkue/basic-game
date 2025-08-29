@@ -6,6 +6,10 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 // Simple color helpers (works on most modern Windows terminals)
 namespace Color {
@@ -159,23 +163,23 @@ void showPlayer(const Player& p) {
 }
 
 void equipItem(Player& p) {
-    std::cout << "\nInventory:" << "\n";
+    std::cout << "\nຄັງຂອງ:" << "\n";
     p.inv.list();
-    std::cout << "\nEnter item number to equip/use (0 to cancel): ";
+    std::cout << "\nໃສ່ເລກລາຍການເພື່ອ ໃສ່/ໃຊ້ (0 ຍົກເລີກ): ";
     int choice; if (!(std::cin >> choice)) { flushLine(); return; }
     flushLine();
     if (choice <= 0 || choice > (int)p.inv.items.size()) return;
     Item it = p.inv.items[choice-1];
     if (it.type == ItemType::Weapon) {
-        std::cout << "Equipped weapon: " << it.name << " (ATK+" << it.power << ")\n";
+        std::cout << "ໃສ່ອາວຸດ: " << it.name << " (ATK+" << it.power << ")\n";
         p.weapon = it;
     } else if (it.type == ItemType::Armor) {
-        std::cout << "Equipped armor: " << it.name << " (DEF+" << it.power << ")\n";
+        std::cout << "ໃສ່ເກາະ: " << it.name << " (DEF+" << it.power << ")\n";
         p.armor = it;
     } else if (it.type == ItemType::Consumable) {
         int before = p.hp;
         p.hp = clamp(p.hp + it.healAmount, 0, p.maxHp);
-        std::cout << Color::green << "+" << (p.hp - before) << " HP" << Color::reset << " from " << it.name << "\n";
+        std::cout << Color::green << "+" << (p.hp - before) << " HP" << Color::reset << " ຈາກ " << it.name << "\n";
         p.inv.removeAt(choice-1);
         return;
     }
@@ -184,7 +188,7 @@ void equipItem(Player& p) {
 void shop(Player& p) {
     std::vector<Item> stock = { Factory::potionSmall(), Factory::potionLarge(), Factory::sword(), Factory::leather(), Factory::greatsword(), Factory::plate() };
     while (true) {
-        std::cout << Color::magenta << "\n== Shop ==" << Color::reset << "  (Gold: $" << p.gold << ")\n";
+        std::cout << Color::magenta << "\n== ຮ້ານຄ້າ ==" << Color::reset << "  (ທອງ: $" << p.gold << ")\n";
         for (size_t i = 0; i < stock.size(); ++i) {
             const auto& it = stock[i];
             std::cout << "  [" << i+1 << "] " << it.name << " - $" << it.price << " (";
@@ -193,54 +197,54 @@ void shop(Player& p) {
             else std::cout << "Heal " << it.healAmount;
             std::cout << ")\n";
         }
-        std::cout << "  [0] Leave\nBuy which item? ";
+        std::cout << "  [0] ອອກ\nຊື້ລາຍການໃດ? ";
         int c; if (!(std::cin >> c)) { flushLine(); return; }
         flushLine();
         if (c == 0) return;
         if (c < 0 || c > (int)stock.size()) continue;
         const Item& it = stock[c-1];
-        if (p.gold < it.price) { std::cout << Color::red << "Not enough gold!" << Color::reset << "\n"; continue; }
+        if (p.gold < it.price) { std::cout << Color::red << "ທອງບໍ່ພຽງພໍ!" << Color::reset << "\n"; continue; }
         p.gold -= it.price;
         p.inv.add(it);
-        std::cout << Color::green << "Purchased " << it.name << "!" << Color::reset << "\n";
+        std::cout << Color::green << "ຊື້ແລ້ວ: " << it.name << "!" << Color::reset << "\n";
     }
 }
 
 void giveLoot(Player& p, const Enemy& e) {
     p.xp += e.xpReward;
     p.gold += e.goldReward;
-    std::cout << Color::yellow << "You gained " << e.xpReward << " XP and $" << e.goldReward << "!" << Color::reset << "\n";
+    std::cout << Color::yellow << "ໄດ້ຮັບ " << e.xpReward << " XP ແລະ $" << e.goldReward << "!" << Color::reset << "\n";
     if (!e.loot.empty() && rng.chance(50)) {
         const Item& it = e.loot[rng.range(0, (int)e.loot.size()-1)];
         p.inv.add(it);
-        std::cout << Color::yellow << "Loot found: " << it.name << "!" << Color::reset << "\n";
+        std::cout << Color::yellow << "ໄດ້ຮັບຂອງດອບ: " << it.name << "!" << Color::reset << "\n";
     }
     p.levelUpIfNeeded();
 }
 
 bool playerTurn(Player& p, Enemy& e) {
-    std::cout << "\nYour turn. Choose action:\n";
-    std::cout << "  1) Attack\n  2) Power Attack (costs 10 HP, high damage)\n  3) Use/Equip Item\n  4) Attempt to Run\n> ";
+    std::cout << "\nຖຶງຕາເຈົ້າ. ເລືອກການກະທໍາ:\n";
+    std::cout << "  1) ໂຈມຕີ\n  2) ພະລັງໂຈມຕີ (ໃຊ້ 10 HP, ເສຍຫາຍສູງ)\n  3) ໃຊ້/ໃສ່ອຸປະກອນ\n  4) ພະຍາຍາມໜີ\n> ";
     int c; if (!(std::cin >> c)) { flushLine(); return true; }
     flushLine();
     if (c == 1) {
         bool crit = rng.chance(15);
         int dmg = computeDamage(p.atk(), e.defense) * (crit ? 2 : 1);
         e.hp = std::max(0, e.hp - dmg);
-        std::cout << Color::green << "You dealt " << dmg << " damage" << (crit? " (CRITICAL)" : "") << "!" << Color::reset << "\n";
+        std::cout << Color::green << "ເຈົ້າໂຈມຕີໄດ້ " << dmg << " ຄວາມເສຍຫາຍ" << (crit? " (ຮ້າຍແຮງ)" : "") << "!" << Color::reset << "\n";
     } else if (c == 2) {
-        if (p.hp <= 10) { std::cout << Color::red << "Not enough HP to perform Power Attack!" << Color::reset << "\n"; }
+        if (p.hp <= 10) { std::cout << Color::red << "HP ບໍ່ພຽງພໍເພື່ອໃຊ້ພະລັງໂຈມຕີ!" << Color::reset << "\n"; }
         else {
             p.hp -= 10;
             int dmg = computeDamage(p.atk()+5, e.defense) + 5;
             e.hp = std::max(0, e.hp - dmg);
-            std::cout << Color::green << "You unleashed a Power Attack for " << dmg << " damage!" << Color::reset << "\n";
+            std::cout << Color::green << "ເຈົ້າໃຊ້ພະລັງໂຈມຕີ ສ້າງ " << dmg << " ຄວາມເສຍຫາຍ!" << Color::reset << "\n";
         }
     } else if (c == 3) {
         equipItem(p);
     } else if (c == 4) {
-        if (rng.chance(40)) { std::cout << Color::yellow << "You managed to run away!" << Color::reset << "\n"; return false; }
-        else std::cout << Color::red << "Failed to run!" << Color::reset << "\n";
+        if (rng.chance(40)) { std::cout << Color::yellow << "ໜີສໍາເລັດ!" << Color::reset << "\n"; return false; }
+        else std::cout << Color::red << "ໜີບໍ່ສໍາເລັດ!" << Color::reset << "\n";
     }
     return true;
 }
@@ -250,12 +254,12 @@ bool enemyTurn(Player& p, Enemy& e) {
     bool special = rng.chance(20);
     int dmg = computeDamage(e.attack + (special?2:0), p.def());
     p.hp = std::max(0, p.hp - dmg);
-    std::cout << Color::red << e.name << " dealt " << dmg << " damage" << (special? " with a savage strike!" : "!") << Color::reset << "\n";
+    std::cout << Color::red << e.name << " ໂຈມຕີໄດ້ " << dmg << " ຄວາມເສຍຫາຍ" << (special? " ດ້ວຍການໂຈມຕີຮ້າຍແຮງ!" : "!") << Color::reset << "\n";
     return p.hp > 0;
 }
 
 bool combat(Player& p, Enemy e) {
-    std::cout << Color::red << "\n== A wild " << e.name << " appears! ==" << Color::reset << "\n";
+    std::cout << Color::red << "\n== " << e.name << " ປາກົດຕົວ! ==" << Color::reset << "\n";
     while (p.hp > 0 && e.hp > 0) {
         std::cout << "\n" << p.name << " HP: " << p.hp << "/" << p.maxHp << "  |  " << e.name << " HP: " << e.hp << "/" << e.maxHp << "\n";
         bool stayed = playerTurn(p, e);
@@ -264,10 +268,10 @@ bool combat(Player& p, Enemy e) {
         if (!enemyTurn(p, e)) break;
     }
     if (p.hp <= 0) {
-        std::cout << Color::red << "\nYou were defeated..." << Color::reset << "\n";
+        std::cout << Color::red << "\nເຈົ້າແພ້..." << Color::reset << "\n";
         return false;
     }
-    std::cout << Color::green << "\nYou defeated the " << e.name << "!" << Color::reset << "\n";
+    std::cout << Color::green << "\nເຈົ້າຊະນະ " << e.name << "!" << Color::reset << "\n";
     giveLoot(p, e);
     return true;
 }
@@ -279,15 +283,15 @@ struct Location {
 
 std::vector<Location> buildWorld() {
     return {
-        { "Meadow", { Factory::slime(), Factory::wolf() } },
-        { "Bandit Road", { Factory::bandit(), Factory::wolf() } },
-        { "Volcanic Cave", { Factory::dragonling(), Factory::bandit() } }
+        { "ທົ່ງຫຍ້າ", { Factory::slime(), Factory::wolf() } },
+        { "ທາງໂຈນ", { Factory::bandit(), Factory::wolf() } },
+        { "ຖ້ຳພູໄຟ", { Factory::dragonling(), Factory::bandit() } }
     };
 }
 
 void saveGame(const Player& p, const std::string& path) {
     std::ofstream f(path);
-    if (!f) { std::cout << Color::red << "Failed to save!" << Color::reset << "\n"; return; }
+    if (!f) { std::cout << Color::red << "ບັນທຶກບໍ່ສໍາເລັດ!" << Color::reset << "\n"; return; }
     // Very simple save format
     f << p.name << "\n" << p.level << " " << p.xp << " " << p.gold << "\n";
     f << p.hp << " " << p.maxHp << " " << p.attack << " " << p.defense << "\n";
@@ -297,7 +301,7 @@ void saveGame(const Player& p, const std::string& path) {
     for (const auto& it : p.inv.items) {
         f << (int)it.type << "|" << it.name << "|" << it.power << "|" << it.healAmount << "|" << it.price << "\n";
     }
-    std::cout << Color::green << "Game saved to " << path << Color::reset << "\n";
+    std::cout << Color::green << "ບັນທຶກເກມໄວ້ທີ່ " << path << Color::reset << "\n";
 }
 
 bool loadGame(Player& p, const std::string& path) {
@@ -335,12 +339,12 @@ bool loadGame(Player& p, const std::string& path) {
         }
     }
     p.hp = clamp(p.hp, 0, p.maxHp);
-    std::cout << Color::green << "Loaded save from " << path << Color::reset << "\n";
+    std::cout << Color::green << "ໂຫຼດເກມຈາກ " << path << Color::reset << "\n";
     return true;
 }
 
 void explore(Player& p, const Location& loc) {
-    std::cout << Color::blue << "\nExploring " << loc.name << "..." << Color::reset << "\n";
+    std::cout << Color::blue << "\nກຳລັງສຳຫຼວດ " << loc.name << "..." << Color::reset << "\n";
     if (rng.chance(60)) {
         const Enemy& proto = loc.encounters[rng.range(0, (int)loc.encounters.size()-1)];
         Enemy e = proto;
@@ -354,13 +358,13 @@ void explore(Player& p, const Location& loc) {
         if (eventRoll <= 40) {
             int found = rng.range(5, 25);
             p.gold += found;
-            std::cout << Color::yellow << "You found a pouch of coins: $" << found << "!" << Color::reset << "\n";
+            std::cout << Color::yellow << "ເຈົ້າພົບຖົງເງິນ: $" << found << "!" << Color::reset << "\n";
         } else if (eventRoll <= 70) {
             Item it = rng.chance(50) ? Factory::potionSmall() : Factory::potionLarge();
             p.inv.add(it);
-            std::cout << Color::yellow << "You discovered an item: " << it.name << "!" << Color::reset << "\n";
+            std::cout << Color::yellow << "ເຈົ້າພົບຂອງ: " << it.name << "!" << Color::reset << "\n";
         } else {
-            std::cout << "It's quiet... You take a short rest and recover 5 HP.\n";
+            std::cout << "ເງີຍສະງົບ... ເຈົ້າພັກເພີ່ຍໆ ແລະ ຟື້ນ 5 HP.\n";
             p.hp = clamp(p.hp + 5, 0, p.maxHp);
         }
     }
@@ -369,16 +373,16 @@ void explore(Player& p, const Location& loc) {
 void mainMenu(Player& p) {
     auto world = buildWorld();
     while (true) {
-        std::cout << Color::bold << "\n===== Rift of Realms: Text RPG =====" << Color::reset << "\n";
+        std::cout << Color::bold << "\n===== Rift of Realms: ເກມ RPG ແບບຂໍ້ຄວາມ =====" << Color::reset << "\n";
         showPlayer(p);
-        std::cout << "\nChoose an action:\n";
-        std::cout << "  1) Explore\n  2) Shop\n  3) Inventory/Equip\n  4) Save Game\n  5) Load Game\n  6) Rest at Inn ($10)\n  7) Quit\n> ";
+        std::cout << "\nເລືອກການກະທໍາ:\n";
+        std::cout << "  1) ສໍາຫຼວດ\n  2) ຮ້ານຄ້າ\n  3) ຄັງຂອງ/ໃສ່ອຸປະກອນ\n  4) ບັນທຶກເກມ\n  5) ໂຫຼດເກມ\n  6) ພັກຜ່ອນທີ່ໂຮງແຮມ ($10)\n  7) ອອກ\n> ";
         int c; if (!(std::cin >> c)) { flushLine(); continue; }
         flushLine();
         if (c == 1) {
-            std::cout << "Choose a location:\n";
+            std::cout << "ເລືອກສະຖານທີ່:\n";
             for (size_t i = 0; i < world.size(); ++i) std::cout << "  [" << i+1 << "] " << world[i].name << "\n";
-            std::cout << "  [0] Cancel\n> ";
+            std::cout << "  [0] ຍົກເລີກ\n> ";
             int l; if (!(std::cin >> l)) { flushLine(); continue; }
             flushLine();
             if (l <= 0 || l > (int)world.size()) continue;
@@ -390,12 +394,12 @@ void mainMenu(Player& p) {
         } else if (c == 4) {
             saveGame(p, "save.txt");
         } else if (c == 5) {
-            if (!loadGame(p, "save.txt")) std::cout << Color::red << "No save found." << Color::reset << "\n";
+            if (!loadGame(p, "save.txt")) std::cout << Color::red << "ບໍ່ພົບໄຟລ໌ບັນທຶກ." << Color::reset << "\n";
         } else if (c == 6) {
-            if (p.gold < 10) std::cout << Color::red << "Not enough gold!" << Color::reset << "\n";
-            else { p.gold -= 10; p.hp = p.maxHp; std::cout << Color::green << "You feel refreshed!" << Color::reset << "\n"; }
+            if (p.gold < 10) std::cout << Color::red << "ທອງບໍ່ພຽງພໍ!" << Color::reset << "\n";
+            else { p.gold -= 10; p.hp = p.maxHp; std::cout << Color::green << "ເຈົ້າຮູ້ສຶກຟື້ນຟູ!" << Color::reset << "\n"; }
         } else if (c == 7) {
-            std::cout << "Goodbye, adventurer!\n";
+            std::cout << "ລາກ່ອນ ນັກຜະຈົນໄພ!\n";
             break;
         }
     }
@@ -404,13 +408,23 @@ void mainMenu(Player& p) {
 int main() {
     std::ios::sync_with_stdio(false);
     std::cin.tie(nullptr);
+#ifdef _WIN32
+    // Switch console to UTF-8 and enable ANSI colors on Windows
+    SetConsoleOutputCP(65001);
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hOut != INVALID_HANDLE_VALUE) {
+        DWORD mode = 0; GetConsoleMode(hOut, &mode);
+        mode |= 0x0004; // ENABLE_VIRTUAL_TERMINAL_PROCESSING
+        SetConsoleMode(hOut, mode);
+    }
+#endif
 
     Player p; p.name = "Hero"; p.level = 1; p.maxHp = p.hp = 35; p.attack = 6; p.defense = 2; p.gold = 30;
     p.inv.add(Factory::potionSmall());
     p.inv.add(Factory::potionSmall());
 
-    std::cout << Color::bold << "\nWelcome to Rift of Realms!" << Color::reset << "\n";
-    std::cout << "Enter your hero's name (press Enter for 'Hero'): ";
+    std::cout << Color::bold << "\nຍິນດີຕ້ອນຮັບສູ່ Rift of Realms!" << Color::reset << "\n";
+    std::cout << "ໃສ່ຊື່ຮີໂຣ (ກົດ Enter ເພື່ອ 'Hero'): ";
     std::string nm; std::getline(std::cin, nm);
     if (!nm.empty()) p.name = nm;
 
